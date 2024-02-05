@@ -1,0 +1,108 @@
+mql5
+//+------------------------------------------------------------------+
+//|                                      Ivan EA                    |
+//|                      Developer: Forex Robot Easy Team            |
+//|                      Website: forexroboteasy.com                 |
+//+------------------------------------------------------------------+
+
+// Include necessary libraries
+#include <Trade\PositionInfo.mqh>
+#include <Trade\OrderInfo.mqh>
+
+// Define constants
+#define RSI_PERIOD 14
+#define EMA_PERIOD 50
+#define PULLBACK_LIMIT 0.5
+#define STOP_LOSS 50
+#define TAKE_PROFIT 100
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//|                        OnTick Event                              |
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   // Get RSI value
+   double rsi = iRSI(NULL, 0, RSI_PERIOD, PRICE_CLOSE, 0);
+
+   // Get EMA value
+   double ema = iMA(NULL, 0, EMA_PERIOD, 0, MODE_EMA, PRICE_CLOSE, 0);
+
+   // Get current bar price
+   double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+
+   // Determine market trend
+   bool isUptrend = rsi > 50 && currentPrice > ema;
+   bool isDowntrend = rsi < 50 && currentPrice < ema;
+
+   // Check for pullback condition
+   bool isPullback = MathAbs(currentPrice - ema) / SymbolInfoDouble(_Symbol, SYMBOL_POINT) <= PULLBACK_LIMIT;
+
+   // Check if there is an open position
+   if (PositionsTotal() == 0)
+   {
+      // Open new position if conditions are met
+      if ((isUptrend || isDowntrend) && isPullback)
+      {
+         int ticket = OrderSend(_Symbol, OP_BUY, 0.01, currentPrice, 0, currentPrice - STOP_LOSS * SymbolInfoDouble(_Symbol, SYMBOL_POINT), currentPrice + TAKE_PROFIT * SymbolInfoDouble(_Symbol, SYMBOL_POINT), 'Ivan EA', 0, 0, clrGreen);
+         if (ticket > 0)
+         {
+            // Position opened successfully
+            Print('Position opened with ticket number: ', ticket);
+         }
+         else
+         {
+            // Position opening failed
+            Print('Failed to open position. Error code: ', GetLastError());
+         }
+      }
+   }
+   else
+   {
+      // Check for exit conditions
+      for (int i = 0; i < PositionsTotal(); i++)
+      {
+         CPositionInfo position;
+         position.SelectByIndex(i);
+
+         // Close position if it reaches the stop loss or take profit levels
+         if (position.StopLoss() <= currentPrice || position.TakeProfit() >= currentPrice)
+         {
+            bool result = position.Close();
+            if (result)
+            {
+               // Position closed successfully
+               Print('Position closed: ', position.PositionTicket());
+            }
+            else
+            {
+               // Position closing failed
+               Print('Failed to close position: ', position.PositionTicket());
+            }
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//|                        OnDeinit Event                            |
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+   // Cleanup code if required
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//|                        OnInit Event                              |
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OnInit()
+{
+   // Initialization code if required
+}
+
+//+------------------------------------------------------------------+
